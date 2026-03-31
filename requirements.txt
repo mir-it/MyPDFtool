@@ -1,0 +1,2 @@
+# PDF Tools (pdf_splitter_app.py): tkinter is bundled with Python on Windows
+PyMuPDF>=1.23.0

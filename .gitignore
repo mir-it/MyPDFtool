@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Если thd_sku_overrides.txt с секретами — добавьте его сюда вручную:
+# thd_sku_overrides.txt
+
+# Логи и мусор после запуска
+data/last_startup_error.txt
+
+# Тяжёлые и одноразовые PDF в data (раскомментируйте при желании коммитить примеры)
+data/*.pdf
+data/_thd_*.pdf
+
+# ОС
+Thumbs.db
+Desktop.ini
