@@ -182,17 +182,17 @@ def _extract_ref1_id(text: str) -> str | None:
 
 
 # -----------------------------------------------------------------------------
-# Packing slips + labels — OPTIONAL multi-page slip grouping (запасной режим)
+# Packing slips + labels — OPTIONAL multi-page slip grouping (fallback mode)
 #
-# При False (КАК СЕЙЧАС): каждая страница слипа с совпавшим ref получает СВОЮ
-# копию страницы лейбла (даже если подряд несколько страниц одного заказа).
+# When False (CURRENT): each slip page with a matched ref gets its OWN copy of
+# the label page (even if several consecutive slip pages belong to one order).
 #
-# При True: подряд идущие страницы с ОДИНАКОВЫМ ref (и с матчем в label_map)
-# объединяются в один блок: все эти страницы слипа подряд, затем ОДИН лейбл
-# на весь блок. Разрыв ref / страница без ref — начинается новый блок.
+# When True: consecutive slip pages with the SAME ref (and a match in label_map)
+# are merged into one block: all those slip pages in a row, then ONE label page
+# for the whole block. A ref break / page without ref starts a new block.
 #
-# ВАЖНО: сейчас значение False — режим НЕ активен, на вкладке ничего не переключается.
-# Чтобы включить в будущем: поставьте True и прогоните на тестовых PDF (QA).
+# NOTE: False means the mode is OFF; the tab has no toggle for this yet.
+# To enable later: set True and run QA on test PDFs.
 # -----------------------------------------------------------------------------
 PACKING_SLIPS_GROUP_CONSECUTIVE_SAME_REF = False
 
@@ -313,12 +313,12 @@ def _merge_slips_with_labels_grouped_consecutive_same_ref(
     output_path: Path,
 ) -> tuple[list[str], int, int, Path | None]:
     """
-    ЗАПАСНОЙ режим (включается только если PACKING_SLIPS_GROUP_CONSECUTIVE_SAME_REF = True).
+    Fallback mode (only when PACKING_SLIPS_GROUP_CONSECUTIVE_SAME_REF = True).
 
-    Подряд идущие страницы с одним и тем же ref (и найденным лейблом) → один блок слипов,
-    затем одна страница лейбла. Имя второго файла и сводка без матча — как в per-page.
+    Consecutive slip pages with the same ref (and a found label) → one slip block,
+    then one label page. Second file name and no-match summary — same as per-page.
 
-    НЕ используется, пока константа выше = False.
+    Not used while the constant above is False.
     """
     log: list[str] = []
     slips = fitz.open(str(packing_path))
@@ -454,7 +454,7 @@ class App(tk.Tk):
         self.tile_slip_var = tk.StringVar()
         self.tile_labels_var = tk.StringVar()
         self.tile_out_var = tk.StringVar()
-        self.tile_status_var = tk.StringVar(value="Готово")
+        self.tile_status_var = tk.StringVar(value="Ready")
         self.tile_excl_add_var = tk.StringVar()
         self.tile_excl_search_var = tk.StringVar()
         self.tile_exclusions_path = default_exclusions_path()
@@ -464,22 +464,13 @@ class App(tk.Tk):
         self.hd_slip_var = tk.StringVar()
         self.hd_labels_var = tk.StringVar()
         self.hd_out_var = tk.StringVar()
-        self.hd_status_var = tk.StringVar(value="Готово")
+        self.hd_status_var = tk.StringVar(value="Ready")
         self.hd_excl_add_var = tk.StringVar()
         self.hd_excl_search_var = tk.StringVar()
         self.hd_exclusions_path = default_hd_exclusions_path()
         self.hd_exclusions: list[str] = load_hd_exclusions(self.hd_exclusions_path)
 
         self._build_ui()
-        # Popup after first paint (better focus on some systems)
-        self.after(80, self._show_startup_message)
-
-    def _show_startup_message(self):
-        messagebox.showinfo(
-            APP_DISPLAY_NAME,
-            "If you use this program, praise the name of the great Konstantin.",
-            parent=self,
-        )
 
     def _build_ui(self):
         root = ttk.Frame(self, padding=10)
@@ -658,7 +649,7 @@ class App(tk.Tk):
         ).pack(anchor="w")
         tk.Label(
             main,
-            text="Packing slip: строки *-smpl → поиск листа в каталоге лейблов → в конец PDF.",
+            text="Packing slip: *-smpl lines → find label sheet in catalog → append to end of PDF.",
             font=("Segoe UI", 9),
             bg=BG,
             fg=SUB,
@@ -686,7 +677,7 @@ class App(tk.Tk):
             e.pack(side="left", fill="x", expand=True, padx=8, pady=8)
             tk.Button(
                 inner,
-                text="Обзор…",
+                text="Browse…",
                 command=browse_cmd,
                 font=("Segoe UI", 9),
                 bg="#3c3c3c",
@@ -697,14 +688,14 @@ class App(tk.Tk):
             ).pack(side="right", padx=6, pady=6)
 
         row_file("1. Packing slip PDF", self.tile_slip_var, self.tile_pick_slip, "#3a7bd5")
-        row_file("2. Каталог лейблов (New_4x5_TC_ALL…)", self.tile_labels_var, self.tile_pick_labels, "#7c4dff")
-        row_file("3. Результат", self.tile_out_var, self.tile_pick_out, "#2e9d5c")
+        row_file("2. Label catalog (New_4x5_TC_ALL…)", self.tile_labels_var, self.tile_pick_labels, "#7c4dff")
+        row_file("3. Output", self.tile_out_var, self.tile_pick_out, "#2e9d5c")
 
         run_fr = tk.Frame(main, bg=BG)
         run_fr.pack(fill="x", pady=(16, 8))
         tk.Button(
             run_fr,
-            text="ОБЪЕДИНИТЬ",
+            text="MERGE",
             command=self.tile_run_merge,
             font=("Segoe UI", 11, "bold"),
             bg=ACCENT,
@@ -717,7 +708,7 @@ class App(tk.Tk):
         ).pack(side="left")
         tk.Button(
             run_fr,
-            text="Открыть папку результата",
+            text="Open output folder",
             command=self.tile_open_out_dir,
             font=("Segoe UI", 9),
             bg="#3c3c3c",
@@ -751,14 +742,14 @@ class App(tk.Tk):
 
         tk.Label(
             right,
-            text="Исключения SKU",
+            text="SKU exclusions",
             font=("Segoe UI", 11, "bold"),
             bg=PANEL,
             fg=FG,
         ).pack(anchor="w", padx=12, pady=(14, 6))
         tk.Label(
             right,
-            text="Если код содержит строку — не печатаем (напр. tcmod → TCMODOLV258).",
+            text="If the code contains this substring — skip printing (e.g. tcmod → TCMODOLV258).",
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
@@ -801,7 +792,7 @@ class App(tk.Tk):
 
         tk.Label(
             right,
-            text="Список (сохраняется автоматически)",
+            text="List (saved automatically)",
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
@@ -890,7 +881,7 @@ class App(tk.Tk):
     def tile_open_out_dir(self):
         p = (self.tile_out_var.get() or "").strip()
         if not p:
-            messagebox.showinfo("Папка", "Сначала укажите файл результата.", parent=self)
+            messagebox.showinfo("Folder", "Specify an output file first.", parent=self)
             return
         folder = Path(p).parent
         if folder.exists():
@@ -899,37 +890,37 @@ class App(tk.Tk):
 
                 os.startfile(folder)  # type: ignore[attr-defined]
             except Exception as e:
-                messagebox.showerror("Ошибка", str(e), parent=self)
+                messagebox.showerror("Error", str(e), parent=self)
         else:
-            messagebox.showinfo("Папка", f"Папка ещё не существует:\n{folder}", parent=self)
+            messagebox.showinfo("Folder", f"Folder does not exist yet:\n{folder}", parent=self)
 
     def tile_run_merge(self):
         slip = Path(self.tile_slip_var.get().strip())
         labels = Path(self.tile_labels_var.get().strip())
         out_s = self.tile_out_var.get().strip()
         if not slip.exists() or slip.suffix.lower() != ".pdf":
-            messagebox.showerror("Ошибка", "Укажите корректный packing slip PDF.", parent=self)
+            messagebox.showerror("Error", "Select a valid packing slip PDF.", parent=self)
             return
         if not labels.exists() or labels.suffix.lower() != ".pdf":
-            messagebox.showerror("Ошибка", "Укажите корректный PDF каталога лейблов.", parent=self)
+            messagebox.showerror("Error", "Select a valid label catalog PDF.", parent=self)
             return
         if not out_s:
-            messagebox.showerror("Ошибка", "Укажите путь для результата.", parent=self)
+            messagebox.showerror("Error", "Specify an output path.", parent=self)
             return
         out = Path(out_s)
         if out.suffix.lower() != ".pdf":
             out = out.with_suffix(".pdf")
             self.tile_out_var.set(str(out))
 
-        self.tile_status_var.set("Обработка…")
+        self.tile_status_var.set("Processing…")
         self.update_idletasks()
         try:
             log_lines = merge_packing_with_sample_labels(slip, labels, out, self.tile_exclusions)
-            self._tile_set_log("\n".join(log_lines) + f"\n\nФайл:\n{out}")
-            self.tile_status_var.set("Готово")
+            self._tile_set_log("\n".join(log_lines) + f"\n\nFile:\n{out}")
+            self.tile_status_var.set("Completed")
         except Exception as e:
-            self.tile_status_var.set("Ошибка")
-            messagebox.showerror("Ошибка", str(e), parent=self)
+            self.tile_status_var.set("Error")
+            messagebox.showerror("Error", str(e), parent=self)
 
     def _build_hd_thd_tab(self, root: ttk.Frame):
         BG = "#1e1e1e"
@@ -957,8 +948,8 @@ class App(tk.Tk):
         ).pack(anchor="w")
         tk.Label(
             main,
-            text="Packing slip: колонка Model Number (строка SMPL/ASMPL) + Qty Shipped; "
-            "лейблы: Product Sku в THD Barcode Labels.",
+            text="Packing slip: Model Number column (SMPL/ASMPL) + Qty Shipped; "
+            "labels: Product Sku in THD Barcode Labels.",
             font=("Segoe UI", 9),
             bg=BG,
             fg=SUB,
@@ -986,7 +977,7 @@ class App(tk.Tk):
             e.pack(side="left", fill="x", expand=True, padx=8, pady=8)
             tk.Button(
                 inner,
-                text="Обзор…",
+                text="Browse…",
                 command=browse_cmd,
                 font=("Segoe UI", 9),
                 bg="#3c3c3c",
@@ -998,13 +989,13 @@ class App(tk.Tk):
 
         row_file("1. Packing slip PDF (Home Depot)", self.hd_slip_var, self.hd_pick_slip, "#3a7bd5")
         row_file("2. THD Barcode Labels PDF", self.hd_labels_var, self.hd_pick_labels, "#c66900")
-        row_file("3. Результат", self.hd_out_var, self.hd_pick_out, "#2e9d5c")
+        row_file("3. Output", self.hd_out_var, self.hd_pick_out, "#2e9d5c")
 
         run_fr = tk.Frame(main, bg=BG)
         run_fr.pack(fill="x", pady=(16, 8))
         tk.Button(
             run_fr,
-            text="ОБЪЕДИНИТЬ",
+            text="MERGE",
             command=self.hd_run_merge,
             font=("Segoe UI", 11, "bold"),
             bg=ACCENT,
@@ -1017,7 +1008,7 @@ class App(tk.Tk):
         ).pack(side="left")
         tk.Button(
             run_fr,
-            text="Открыть папку результата",
+            text="Open output folder",
             command=self.hd_open_out_dir,
             font=("Segoe UI", 9),
             bg="#3c3c3c",
@@ -1051,14 +1042,14 @@ class App(tk.Tk):
 
         tk.Label(
             right,
-            text="Исключения SKU",
+            text="SKU exclusions",
             font=("Segoe UI", 11, "bold"),
             bg=PANEL,
             fg=FG,
         ).pack(anchor="w", padx=12, pady=(14, 6))
         tk.Label(
             right,
-            text="Если код содержит подстроку — строка пропускается (отдельный список от Tile Club).",
+            text="If the code contains this substring — the line is skipped (separate list from Tile Club).",
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
@@ -1101,7 +1092,7 @@ class App(tk.Tk):
 
         tk.Label(
             right,
-            text="Список (сохраняется автоматически)",
+            text="List (saved automatically)",
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
@@ -1190,7 +1181,7 @@ class App(tk.Tk):
     def hd_open_out_dir(self):
         p = (self.hd_out_var.get() or "").strip()
         if not p:
-            messagebox.showinfo("Папка", "Сначала укажите файл результата.", parent=self)
+            messagebox.showinfo("Folder", "Specify an output file first.", parent=self)
             return
         folder = Path(p).parent
         if folder.exists():
@@ -1199,37 +1190,37 @@ class App(tk.Tk):
 
                 os.startfile(folder)  # type: ignore[attr-defined]
             except Exception as e:
-                messagebox.showerror("Ошибка", str(e), parent=self)
+                messagebox.showerror("Error", str(e), parent=self)
         else:
-            messagebox.showinfo("Папка", f"Папка ещё не существует:\n{folder}", parent=self)
+            messagebox.showinfo("Folder", f"Folder does not exist yet:\n{folder}", parent=self)
 
     def hd_run_merge(self):
         slip = Path(self.hd_slip_var.get().strip())
         labels = Path(self.hd_labels_var.get().strip())
         out_s = self.hd_out_var.get().strip()
         if not slip.exists() or slip.suffix.lower() != ".pdf":
-            messagebox.showerror("Ошибка", "Укажите корректный packing slip PDF.", parent=self)
+            messagebox.showerror("Error", "Select a valid packing slip PDF.", parent=self)
             return
         if not labels.exists() or labels.suffix.lower() != ".pdf":
-            messagebox.showerror("Ошибка", "Укажите корректный THD Barcode Labels PDF.", parent=self)
+            messagebox.showerror("Error", "Select a valid THD Barcode Labels PDF.", parent=self)
             return
         if not out_s:
-            messagebox.showerror("Ошибка", "Укажите путь для результата.", parent=self)
+            messagebox.showerror("Error", "Specify an output path.", parent=self)
             return
         out = Path(out_s)
         if out.suffix.lower() != ".pdf":
             out = out.with_suffix(".pdf")
             self.hd_out_var.set(str(out))
 
-        self.hd_status_var.set("Обработка…")
+        self.hd_status_var.set("Processing…")
         self.update_idletasks()
         try:
             log_lines = merge_hd_packing_with_thd_labels(slip, labels, out, self.hd_exclusions)
-            self._hd_set_log("\n".join(log_lines) + f"\n\nФайл:\n{out}")
-            self.hd_status_var.set("Готово")
+            self._hd_set_log("\n".join(log_lines) + f"\n\nFile:\n{out}")
+            self.hd_status_var.set("Completed")
         except Exception as e:
-            self.hd_status_var.set("Ошибка")
-            messagebox.showerror("Ошибка", str(e), parent=self)
+            self.hd_status_var.set("Error")
+            messagebox.showerror("Error", str(e), parent=self)
 
     def pick_pdf(self):
         p = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])

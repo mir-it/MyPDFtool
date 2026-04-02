@@ -6,13 +6,13 @@ __pycache__/
 venv/
 env/
 
-# Если thd_sku_overrides.txt с секретами — добавьте его сюда вручную:
+# If thd_sku_overrides.txt contains secrets — add it here manually:
 # thd_sku_overrides.txt
 
-# Логи и мусор после запуска
+# Logs and run artifacts
 data/last_startup_error.txt
 
-# Тяжёлые и одноразовые PDF в data (раскомментируйте при желании коммитить примеры)
+# Large / one-off PDFs in data (uncomment if you want to commit examples)
 data/*.pdf
 data/_thd_*.pdf
 

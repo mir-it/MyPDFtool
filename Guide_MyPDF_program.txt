@@ -1,0 +1,141 @@
+================================================================================
+  How to use the MyPDF tool — in plain language
+  (TC Team, Appolo Team, and anyone opening the app for the first time)
+================================================================================
+
+Below is the main workflow as intended: what each tab is for and how they fit
+together. At the end: how to launch, folders, and the other tabs.
+
+
+--------------------------------------------------------------------------------
+MERGE PDFs tab (for TC Team and Appolo Team)
+--------------------------------------------------------------------------------
+
+This tab merges several packing-slip PDFs into one large PDF.
+
+Why?
+The India team sends PDFs with usually no more than ~100 packing slips each.
+You may get several such files in a row. Instead of juggling many separate files,
+you merge them into one “big” document for the next steps.
+
+Important: the app orders parts by order date (the Date: line on page 1 of each
+piece) so the combined file is chronological, not “whatever order they arrived in.”
+
+Note: the order of files in the window list is not the final order; check the
+report after Merge — it shows the timeline.
+
+
+--------------------------------------------------------------------------------
+SPLIT ORDERS / SAMPLES tab (for Appolo Team)
+--------------------------------------------------------------------------------
+
+This tab splits an already merged file (from Merge PDFs) into two documents:
+  • one with only sample pages (samples),
+  • one with only orders (orders).
+
+This avoids manual sorting of hundreds of pages: the app uses the
+Model Number / Qty Shipped table and applies clear rules for sample vs order.
+
+After Split you usually get:
+  source_name_samples.pdf
+  source_name_orders.pdf
+
+Often the next step needs *_samples.pdf — the “clean” sample stream.
+
+Important: within both samples and orders, pages are sorted by Date: on the
+packing slip (older first, newer later) when the date can be read from the PDF.
+
+Please pay attention to which folder you save to (Output Folder) — it makes
+files easier to find later.
+
+The “Use legacy overrides (for old approved test files)” checkbox is only for
+old test PDFs from development. Leave it OFF for normal work.
+
+
+--------------------------------------------------------------------------------
+PACKING SLIPS + LABELS tab (for Appolo Team)
+--------------------------------------------------------------------------------
+
+After Merge and Split you usually have a samples document — often something like
+merged_output_samples.pdf (exact name depends on what you named the merged file
+and where you saved it).
+
+If on this tab you merge:
+  • that PDF (samples slips)
+  • with the daily THD Samples file from the India team (labels PDF with REF 1, etc.),
+
+labels are matched by order numbers and appended after the packing slip pages in
+slip order. You do not pick label pages by hand — check the log after run to see
+what matched and what was skipped.
+
+Note: this is separate from the “Home Depot THD (SMPL)” tab below: one tab is
+generic slip + labels by REF; the other is the HD pipeline with Product Sku and
+its own rules.
+
+
+--------------------------------------------------------------------------------
+Typical flow in one line
+--------------------------------------------------------------------------------
+
+  Several PDFs from India → Merge PDFs → one large PDF
+  → Split Orders / Samples → *_samples.pdf and *_orders.pdf
+  → Packing Slips + Labels: samples + THD labels → final file with slips and labels.
+
+
+--------------------------------------------------------------------------------
+Other tabs (short)
+--------------------------------------------------------------------------------
+
+  • Tile Club Samples (-smpl)
+    Different supplier rules (*-smpl, New_4x5 labels). Exclusions are stored in
+    the Windows user profile (see below).
+
+  • Home Depot THD (SMPL)
+    Home Depot packing + “THD Barcode Labels…” PDF. If slip and label disagree on
+    SKU line, edit thd_sku_overrides.txt (see project folder, MyPDFtool\data, or
+    next to your PDF).
+
+
+--------------------------------------------------------------------------------
+How to launch the program
+--------------------------------------------------------------------------------
+
+  1) Python 3.10+ on the PC, and once in the project folder run:
+       python -m pip install -r requirements.txt
+
+  2) Launch:
+       • double-click START_NO_CONSOLE.vbs (no black window), or
+       • run_pdf_tools.bat (with console — easier to see errors), or
+       • command line:  python pdf_splitter_app.py
+
+  If the window does not open, see the error text in:
+       MyPDFtool\data\last_startup_error.txt
+
+
+--------------------------------------------------------------------------------
+Folders: what not to touch by hand
+--------------------------------------------------------------------------------
+
+  MyPDFtool\          — code and launch (.py, .bat, .vbs). You can copy the whole
+                        folder to another PC and run pip install again.
+
+  MyPDFtool\data\     — backups, thd_sku_overrides*.txt samples, logs, test PDFs.
+                        Large PDFs here only use disk space; the app does not require them.
+
+  C:\Users\YOUR_LOGIN\.tileclub_sample_merger\
+                        Saved “exclusions” for Tile Club and THD (not inside the
+                        project folder). Copy to a new PC if needed.
+
+
+--------------------------------------------------------------------------------
+Moving to another computer
+--------------------------------------------------------------------------------
+
+Copy the whole MyPDFtool folder. Install Python and run
+pip install -r requirements.txt inside it. If needed, copy the
+.tileclub_sample_merger folder from the user profile.
+
+
+================================================================================
+End of guide
+================================================================================

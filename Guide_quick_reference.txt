@@ -1,0 +1,11 @@
+Merge PDF tab (FOR TC TEAM AND APPOLO TEAM)
+This tab merges several packing-slip PDFs into one large file.
+Why? The India team sends PDFs with at most about 100 packing slips per file; you may get several files — this makes later steps easier. The next tabs make this obvious.
+
+Split orders / samples tab (FOR APPOLO TEAM)
+This tab splits merged files from “Merge PDF” into two documents: samples only and orders only, so you avoid manual work and save time.
+PS: Pay close attention to where output files are saved.
+
+Packing slips + labels tab (FOR APPOLO TEAM)
+After the steps above you should have something like merged_output_samples. If you merge it on this tab with the daily THD Samples PDF from the India team, labels are indexed in order and aligned with order numbers.
+
