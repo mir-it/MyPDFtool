@@ -31,6 +31,7 @@ from tileclub_sample_merger import (
     merge_packing_with_sample_labels,
     save_exclusions,
 )
+from i18n import load_lang, save_lang, t as ui_t
 
 
 def write_subset_pdf(src_path: Path, pages_1_based: list[int], output_path: Path) -> None:
@@ -423,38 +424,38 @@ def _merge_slips_with_labels_grouped_consecutive_same_ref(
         slips.close()
 
 
-APP_DISPLAY_NAME = "The Magnificent Creation of Konstantin"
-
-
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title(APP_DISPLAY_NAME)
+        self.lang_var = tk.StringVar(value=load_lang())
+        self._i18n_widgets: list[tuple[object, str]] = []
+        _init_lang = self.lang_var.get()
+        self.title(ui_t(_init_lang, "app_title"))
         self.geometry("1100x720")
         self.resizable(False, False)
 
         # Split tab state
         self.pdf_path_var = tk.StringVar()
         self.out_dir_var = tk.StringVar()
-        self.split_status_var = tk.StringVar(value="Ready")
+        self.split_status_var = tk.StringVar(value=ui_t(_init_lang, "st_ready"))
         self.use_overrides_var = tk.BooleanVar(value=False)
 
         # Merge tab state
         self.merge_out_file_var = tk.StringVar()
-        self.merge_status_var = tk.StringVar(value="Ready")
+        self.merge_status_var = tk.StringVar(value=ui_t(_init_lang, "st_ready"))
         self.merge_files: list[Path] = []
 
         # Packing slips + labels tab
         self.logistics_slips_var = tk.StringVar()
         self.logistics_labels_var = tk.StringVar()
         self.logistics_out_var = tk.StringVar()
-        self.logistics_status_var = tk.StringVar(value="Ready")
+        self.logistics_status_var = tk.StringVar(value=ui_t(_init_lang, "st_ready"))
 
         # Tile Club -smpl + labels
         self.tile_slip_var = tk.StringVar()
         self.tile_labels_var = tk.StringVar()
         self.tile_out_var = tk.StringVar()
-        self.tile_status_var = tk.StringVar(value="Ready")
+        self.tile_status_var = tk.StringVar(value=ui_t(_init_lang, "st_ready"))
         self.tile_excl_add_var = tk.StringVar()
         self.tile_excl_search_var = tk.StringVar()
         self.tile_exclusions_path = default_exclusions_path()
@@ -464,43 +465,83 @@ class App(tk.Tk):
         self.hd_slip_var = tk.StringVar()
         self.hd_labels_var = tk.StringVar()
         self.hd_out_var = tk.StringVar()
-        self.hd_status_var = tk.StringVar(value="Ready")
+        self.hd_status_var = tk.StringVar(value=ui_t(_init_lang, "st_ready"))
         self.hd_excl_add_var = tk.StringVar()
         self.hd_excl_search_var = tk.StringVar()
         self.hd_exclusions_path = default_hd_exclusions_path()
         self.hd_exclusions: list[str] = load_hd_exclusions(self.hd_exclusions_path)
 
         self._build_ui()
+        self.lang_var.trace_add("write", lambda *_: self._on_lang_written())
+
+    def _t(self, key: str) -> str:
+        return ui_t(self.lang_var.get(), key)
+
+    def _register_i18n(self, widget: object, key: str) -> None:
+        self._i18n_widgets.append((widget, key))
+
+    def _on_lang_written(self) -> None:
+        save_lang(self.lang_var.get())
+        self._apply_language()
+
+    def _apply_language(self) -> None:
+        self.title(self._t("app_title"))
+        self._title_label.configure(text=self._t("app_title"))
+        tab_keys = ("tab_split", "tab_merge", "tab_logistics", "tab_tile", "tab_hd")
+        for i, key in enumerate(tab_keys):
+            self._notebook.tab(i, text=self._t(key))
+        for w, key in self._i18n_widgets:
+            try:
+                if isinstance(w, (ttk.Label, ttk.Button, ttk.Checkbutton, ttk.Radiobutton)):
+                    w.configure(text=self._t(key))
+                elif isinstance(w, (tk.Label, tk.Button)):
+                    w.configure(text=self._t(key))
+            except tk.TclError:
+                pass
 
     def _build_ui(self):
         root = ttk.Frame(self, padding=10)
         root.pack(fill="both", expand=True)
 
+        top_band = ttk.Frame(root)
+        top_band.pack(fill="x", anchor="e", pady=(0, 6))
+        rb_fr = ttk.Frame(top_band)
+        rb_fr.pack(side="right")
+        lang_lbl = ttk.Label(rb_fr, text=self._t("language"))
+        self._register_i18n(lang_lbl, "language")
+        lang_lbl.pack(side="left", padx=(0, 10))
+        r_en = ttk.Radiobutton(rb_fr, text=self._t("lang_en"), variable=self.lang_var, value="en")
+        self._register_i18n(r_en, "lang_en")
+        r_en.pack(side="left", padx=(0, 8))
+        r_ru = ttk.Radiobutton(rb_fr, text=self._t("lang_ru"), variable=self.lang_var, value="ru")
+        self._register_i18n(r_ru, "lang_ru")
+        r_ru.pack(side="left")
+
         title_wrap = 820
         # Do not pass pady=(...) into tk.Label on Python 3.14+/some Tk builds — TclError: bad screen distance "0 10"
-        title_lbl = tk.Label(
+        self._title_label = tk.Label(
             root,
-            text=APP_DISPLAY_NAME,
+            text=self._t("app_title"),
             font=("Segoe UI", 20, "bold"),
             fg="#1a1a1a",
             justify="center",
             wraplength=title_wrap,
         )
-        title_lbl.pack(fill="x", pady=(0, 10))
+        self._title_label.pack(fill="x", pady=(0, 10))
 
-        notebook = ttk.Notebook(root)
-        notebook.pack(fill="both", expand=True)
+        self._notebook = ttk.Notebook(root)
+        self._notebook.pack(fill="both", expand=True)
 
-        split_tab = ttk.Frame(notebook, padding=14)
-        merge_tab = ttk.Frame(notebook, padding=14)
-        logistics_tab = ttk.Frame(notebook, padding=14)
-        tile_tab = ttk.Frame(notebook, padding=0)
-        hd_tab = ttk.Frame(notebook, padding=0)
-        notebook.add(split_tab, text="Split Orders / Samples")
-        notebook.add(merge_tab, text="Merge PDFs")
-        notebook.add(logistics_tab, text="Packing Slips + Labels")
-        notebook.add(tile_tab, text="Tile Club Samples (-smpl)")
-        notebook.add(hd_tab, text="Home Depot THD (SMPL)")
+        split_tab = ttk.Frame(self._notebook, padding=14)
+        merge_tab = ttk.Frame(self._notebook, padding=14)
+        logistics_tab = ttk.Frame(self._notebook, padding=14)
+        tile_tab = ttk.Frame(self._notebook, padding=0)
+        hd_tab = ttk.Frame(self._notebook, padding=0)
+        self._notebook.add(split_tab, text=self._t("tab_split"))
+        self._notebook.add(merge_tab, text=self._t("tab_merge"))
+        self._notebook.add(logistics_tab, text=self._t("tab_logistics"))
+        self._notebook.add(tile_tab, text=self._t("tab_tile"))
+        self._notebook.add(hd_tab, text=self._t("tab_hd"))
 
         self._build_split_tab(split_tab)
         self._build_merge_tab(merge_tab)
@@ -509,23 +550,35 @@ class App(tk.Tk):
         self._build_hd_thd_tab(hd_tab)
 
     def _build_split_tab(self, root: ttk.Frame):
-        ttk.Label(root, text="Input PDF").grid(row=0, column=0, sticky="w")
+        l0 = ttk.Label(root, text=self._t("split_input_pdf"))
+        self._register_i18n(l0, "split_input_pdf")
+        l0.grid(row=0, column=0, sticky="w")
         ttk.Entry(root, textvariable=self.pdf_path_var, width=88).grid(row=1, column=0, sticky="we", padx=(0, 8))
-        ttk.Button(root, text="Browse...", command=self.pick_pdf).grid(row=1, column=1, sticky="e")
+        b0 = ttk.Button(root, text=self._t("browse"), command=self.pick_pdf)
+        self._register_i18n(b0, "browse")
+        b0.grid(row=1, column=1, sticky="e")
 
-        ttk.Label(root, text="Output Folder").grid(row=2, column=0, sticky="w", pady=(12, 0))
+        l1 = ttk.Label(root, text=self._t("split_output_folder"))
+        self._register_i18n(l1, "split_output_folder")
+        l1.grid(row=2, column=0, sticky="w", pady=(12, 0))
         ttk.Entry(root, textvariable=self.out_dir_var, width=88).grid(row=3, column=0, sticky="we", padx=(0, 8))
-        ttk.Button(root, text="Browse...", command=self.pick_out_dir).grid(row=3, column=1, sticky="e")
+        b1 = ttk.Button(root, text=self._t("browse"), command=self.pick_out_dir)
+        self._register_i18n(b1, "browse")
+        b1.grid(row=3, column=1, sticky="e")
 
-        ttk.Checkbutton(
+        cb = ttk.Checkbutton(
             root,
-            text="Use legacy overrides (for old approved test files)",
+            text=self._t("split_legacy"),
             variable=self.use_overrides_var,
-        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
+        )
+        self._register_i18n(cb, "split_legacy")
+        cb.grid(row=4, column=0, columnspan=2, sticky="w", pady=(12, 0))
 
         btns = ttk.Frame(root)
         btns.grid(row=5, column=0, columnspan=2, sticky="w", pady=(14, 0))
-        ttk.Button(btns, text="Process PDF", command=self.process_split).pack(side="left")
+        pb = ttk.Button(btns, text=self._t("split_process"), command=self.process_split)
+        self._register_i18n(pb, "split_process")
+        pb.pack(side="left")
 
         ttk.Separator(root).grid(row=6, column=0, columnspan=2, sticky="we", pady=(14, 10))
         ttk.Label(root, textvariable=self.split_status_var, foreground="#1f6f43").grid(row=7, column=0, columnspan=2, sticky="w")
@@ -537,7 +590,9 @@ class App(tk.Tk):
         root.columnconfigure(0, weight=1)
 
     def _build_merge_tab(self, root: ttk.Frame):
-        ttk.Label(root, text="Input PDFs (order matters)").grid(row=0, column=0, sticky="w")
+        ml = ttk.Label(root, text=self._t("merge_input_pdfs"))
+        self._register_i18n(ml, "merge_input_pdfs")
+        ml.grid(row=0, column=0, sticky="w")
 
         list_frame = ttk.Frame(root)
         list_frame.grid(row=1, column=0, sticky="nsew", pady=(6, 0))
@@ -551,21 +606,37 @@ class App(tk.Tk):
 
         controls = ttk.Frame(root)
         controls.grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Button(controls, text="Add PDFs...", command=self.merge_add_files).pack(side="left")
-        ttk.Button(controls, text="Remove Selected", command=self.merge_remove_selected).pack(side="left", padx=(8, 0))
-        ttk.Button(controls, text="Move Up", command=self.merge_move_up).pack(side="left", padx=(8, 0))
-        ttk.Button(controls, text="Move Down", command=self.merge_move_down).pack(side="left", padx=(8, 0))
-        ttk.Button(controls, text="Clear", command=self.merge_clear).pack(side="left", padx=(8, 0))
+        ma = ttk.Button(controls, text=self._t("merge_add"), command=self.merge_add_files)
+        self._register_i18n(ma, "merge_add")
+        ma.pack(side="left")
+        mr = ttk.Button(controls, text=self._t("merge_remove"), command=self.merge_remove_selected)
+        self._register_i18n(mr, "merge_remove")
+        mr.pack(side="left", padx=(8, 0))
+        mu = ttk.Button(controls, text=self._t("merge_up"), command=self.merge_move_up)
+        self._register_i18n(mu, "merge_up")
+        mu.pack(side="left", padx=(8, 0))
+        md = ttk.Button(controls, text=self._t("merge_down"), command=self.merge_move_down)
+        self._register_i18n(md, "merge_down")
+        md.pack(side="left", padx=(8, 0))
+        mc = ttk.Button(controls, text=self._t("merge_clear"), command=self.merge_clear)
+        self._register_i18n(mc, "merge_clear")
+        mc.pack(side="left", padx=(8, 0))
 
-        ttk.Label(root, text="Output File").grid(row=3, column=0, sticky="w", pady=(12, 0))
+        ol = ttk.Label(root, text=self._t("merge_output_file"))
+        self._register_i18n(ol, "merge_output_file")
+        ol.grid(row=3, column=0, sticky="w", pady=(12, 0))
         out_row = ttk.Frame(root)
         out_row.grid(row=4, column=0, sticky="we")
         ttk.Entry(out_row, textvariable=self.merge_out_file_var, width=88).pack(side="left", fill="x", expand=True, padx=(0, 8))
-        ttk.Button(out_row, text="Browse...", command=self.merge_pick_out_file).pack(side="left")
+        mb = ttk.Button(out_row, text=self._t("browse"), command=self.merge_pick_out_file)
+        self._register_i18n(mb, "browse")
+        mb.pack(side="left")
 
         run_row = ttk.Frame(root)
         run_row.grid(row=5, column=0, sticky="w", pady=(14, 0))
-        ttk.Button(run_row, text="Merge PDFs", command=self.process_merge).pack(side="left")
+        mrun = ttk.Button(run_row, text=self._t("merge_run"), command=self.process_merge)
+        self._register_i18n(mrun, "merge_run")
+        mrun.pack(side="left")
 
         ttk.Separator(root).grid(row=6, column=0, sticky="we", pady=(14, 10))
         ttk.Label(root, textvariable=self.merge_status_var, foreground="#1f6f43").grid(row=7, column=0, sticky="w")
@@ -578,38 +649,49 @@ class App(tk.Tk):
         root.rowconfigure(1, weight=1)
 
     def _build_logistics_tab(self, root: ttk.Frame):
-        ttk.Label(
+        lh = ttk.Label(
             root,
-            text=(
-                "Match: 8-digit ref on slip (after Ship Via / WN line, or \"PO #\" on return stub) "
-                "<-> REF 1: on label. Output (1): matched packing pages in order, then their labels. "
-                "Output (2) if needed: {your_output_name}_packing_slips_without_labels_YYYY-MM-DD.pdf "
-                "next to the main file."
-            ),
+            text=self._t("logistics_help"),
             wraplength=820,
-        ).grid(row=0, column=0, columnspan=2, sticky="w")
+        )
+        self._register_i18n(lh, "logistics_help")
+        lh.grid(row=0, column=0, columnspan=2, sticky="w")
 
-        ttk.Label(root, text="Packing slips PDF").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        l1 = ttk.Label(root, text=self._t("logistics_slips"))
+        self._register_i18n(l1, "logistics_slips")
+        l1.grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Entry(root, textvariable=self.logistics_slips_var, width=78).grid(
             row=2, column=0, sticky="we", padx=(0, 8)
         )
-        ttk.Button(root, text="Browse...", command=self.logistics_pick_slips).grid(row=2, column=1, sticky="e")
+        lb1 = ttk.Button(root, text=self._t("browse"), command=self.logistics_pick_slips)
+        self._register_i18n(lb1, "browse")
+        lb1.grid(row=2, column=1, sticky="e")
 
-        ttk.Label(root, text="Shipping labels PDF").grid(row=3, column=0, sticky="w", pady=(10, 0))
+        l2 = ttk.Label(root, text=self._t("logistics_labels"))
+        self._register_i18n(l2, "logistics_labels")
+        l2.grid(row=3, column=0, sticky="w", pady=(10, 0))
         ttk.Entry(root, textvariable=self.logistics_labels_var, width=78).grid(
             row=4, column=0, sticky="we", padx=(0, 8)
         )
-        ttk.Button(root, text="Browse...", command=self.logistics_pick_labels).grid(row=4, column=1, sticky="e")
+        lb2 = ttk.Button(root, text=self._t("browse"), command=self.logistics_pick_labels)
+        self._register_i18n(lb2, "browse")
+        lb2.grid(row=4, column=1, sticky="e")
 
-        ttk.Label(root, text="Output PDF").grid(row=5, column=0, sticky="w", pady=(10, 0))
+        l3 = ttk.Label(root, text=self._t("logistics_out"))
+        self._register_i18n(l3, "logistics_out")
+        l3.grid(row=5, column=0, sticky="w", pady=(10, 0))
         out_row = ttk.Frame(root)
         out_row.grid(row=6, column=0, columnspan=2, sticky="we")
         ttk.Entry(out_row, textvariable=self.logistics_out_var, width=78).pack(side="left", fill="x", expand=True, padx=(0, 8))
-        ttk.Button(out_row, text="Browse...", command=self.logistics_pick_out).pack(side="left")
+        lb3 = ttk.Button(out_row, text=self._t("browse"), command=self.logistics_pick_out)
+        self._register_i18n(lb3, "browse")
+        lb3.pack(side="left")
 
         run_row = ttk.Frame(root)
         run_row.grid(row=7, column=0, columnspan=2, sticky="w", pady=(14, 0))
-        ttk.Button(run_row, text="Merge packing slips + labels", command=self.process_logistics).pack(side="left")
+        lrun = ttk.Button(run_row, text=self._t("logistics_run"), command=self.process_logistics)
+        self._register_i18n(lrun, "logistics_run")
+        lrun.pack(side="left")
 
         ttk.Separator(root).grid(row=8, column=0, columnspan=2, sticky="we", pady=(14, 10))
         ttk.Label(root, textvariable=self.logistics_status_var, foreground="#1f6f43").grid(
@@ -640,27 +722,33 @@ class App(tk.Tk):
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
 
-        tk.Label(
+        th = tk.Label(
             main,
-            text="PDF Merger Pro — Tile Club samples",
+            text=self._t("tile_heading"),
             font=("Segoe UI", 16, "bold"),
             bg=BG,
             fg=FG,
-        ).pack(anchor="w")
-        tk.Label(
+        )
+        self._register_i18n(th, "tile_heading")
+        th.pack(anchor="w")
+        td = tk.Label(
             main,
-            text="Packing slip: *-smpl lines → find label sheet in catalog → append to end of PDF.",
+            text=self._t("tile_desc"),
             font=("Segoe UI", 9),
             bg=BG,
             fg=SUB,
             wraplength=560,
             justify="left",
-        ).pack(anchor="w", pady=(4, 14))
+        )
+        self._register_i18n(td, "tile_desc")
+        td.pack(anchor="w", pady=(4, 14))
 
-        def row_file(label_txt: str, var: tk.StringVar, browse_cmd, border: str):
+        def row_file(label_key: str, var: tk.StringVar, browse_cmd, border: str):
             fr = tk.Frame(main, bg=BG)
             fr.pack(fill="x", pady=(0, 10))
-            tk.Label(fr, text=label_txt, font=("Segoe UI", 10), bg=BG, fg=FG).pack(anchor="w")
+            ll = tk.Label(fr, text=self._t(label_key), font=("Segoe UI", 10), bg=BG, fg=FG)
+            self._register_i18n(ll, label_key)
+            ll.pack(anchor="w")
             box = tk.Frame(fr, bg=border, padx=2, pady=2)
             box.pack(fill="x", pady=(4, 0))
             inner = tk.Frame(box, bg=PANEL)
@@ -675,9 +763,9 @@ class App(tk.Tk):
                 relief="flat",
             )
             e.pack(side="left", fill="x", expand=True, padx=8, pady=8)
-            tk.Button(
+            bb = tk.Button(
                 inner,
-                text="Browse…",
+                text=self._t("browse"),
                 command=browse_cmd,
                 font=("Segoe UI", 9),
                 bg="#3c3c3c",
@@ -685,17 +773,19 @@ class App(tk.Tk):
                 activebackground="#505050",
                 activeforeground=FG,
                 relief="flat",
-            ).pack(side="right", padx=6, pady=6)
+            )
+            self._register_i18n(bb, "browse")
+            bb.pack(side="right", padx=6, pady=6)
 
-        row_file("1. Packing slip PDF", self.tile_slip_var, self.tile_pick_slip, "#3a7bd5")
-        row_file("2. Label catalog (New_4x5_TC_ALL…)", self.tile_labels_var, self.tile_pick_labels, "#7c4dff")
-        row_file("3. Output", self.tile_out_var, self.tile_pick_out, "#2e9d5c")
+        row_file("tile_row1", self.tile_slip_var, self.tile_pick_slip, "#3a7bd5")
+        row_file("tile_row2", self.tile_labels_var, self.tile_pick_labels, "#7c4dff")
+        row_file("tile_row3", self.tile_out_var, self.tile_pick_out, "#2e9d5c")
 
         run_fr = tk.Frame(main, bg=BG)
         run_fr.pack(fill="x", pady=(16, 8))
-        tk.Button(
+        tmerge = tk.Button(
             run_fr,
-            text="MERGE",
+            text=self._t("tile_merge"),
             command=self.tile_run_merge,
             font=("Segoe UI", 11, "bold"),
             bg=ACCENT,
@@ -705,10 +795,12 @@ class App(tk.Tk):
             relief="flat",
             padx=18,
             pady=10,
-        ).pack(side="left")
-        tk.Button(
+        )
+        self._register_i18n(tmerge, "tile_merge")
+        tmerge.pack(side="left")
+        tof = tk.Button(
             run_fr,
-            text="Open output folder",
+            text=self._t("tile_open_folder"),
             command=self.tile_open_out_dir,
             font=("Segoe UI", 9),
             bg="#3c3c3c",
@@ -717,7 +809,9 @@ class App(tk.Tk):
             relief="flat",
             padx=12,
             pady=8,
-        ).pack(side="left", padx=(12, 0))
+        )
+        self._register_i18n(tof, "tile_open_folder")
+        tof.pack(side="left", padx=(12, 0))
 
         tk.Label(main, textvariable=self.tile_status_var, font=("Segoe UI", 9), bg=BG, fg="#3ecb7a").pack(
             anchor="w", pady=(10, 4)
@@ -740,22 +834,26 @@ class App(tk.Tk):
         tscr.pack(side="right", fill="y")
         self.tile_log.config(yscrollcommand=tscr.set, state="disabled")
 
-        tk.Label(
+        ts = tk.Label(
             right,
-            text="SKU exclusions",
+            text=self._t("tile_sku_title"),
             font=("Segoe UI", 11, "bold"),
             bg=PANEL,
             fg=FG,
-        ).pack(anchor="w", padx=12, pady=(14, 6))
-        tk.Label(
+        )
+        self._register_i18n(ts, "tile_sku_title")
+        ts.pack(anchor="w", padx=12, pady=(14, 6))
+        thi = tk.Label(
             right,
-            text="If the code contains this substring — skip printing (e.g. tcmod → TCMODOLV258).",
+            text=self._t("tile_sku_hint"),
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
             wraplength=250,
             justify="left",
-        ).pack(anchor="w", padx=12, pady=(0, 8))
+        )
+        self._register_i18n(thi, "tile_sku_hint")
+        thi.pack(anchor="w", padx=12, pady=(0, 8))
 
         tk.Entry(
             right,
@@ -790,13 +888,15 @@ class App(tk.Tk):
             relief="flat",
         ).pack(side="right")
 
-        tk.Label(
+        tlc = tk.Label(
             right,
-            text="List (saved automatically)",
+            text=self._t("tile_list_caption"),
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
-        ).pack(anchor="w", padx=12, pady=(0, 4))
+        )
+        self._register_i18n(tlc, "tile_list_caption")
+        tlc.pack(anchor="w", padx=12, pady=(0, 4))
 
         list_fr = tk.Frame(right, bg=PANEL)
         list_fr.pack(fill="both", expand=True, padx=12, pady=(0, 12))
@@ -858,21 +958,21 @@ class App(tk.Tk):
         self._tile_refresh_excl_list()
 
     def tile_pick_slip(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.tile_slip_var.set(p)
             if not self.tile_out_var.get():
                 self.tile_out_var.set(str(Path(p).parent / "Final_Merge.pdf"))
 
     def tile_pick_labels(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.tile_labels_var.set(p)
 
     def tile_pick_out(self):
         p = filedialog.asksaveasfilename(
             defaultextension=".pdf",
-            filetypes=[("PDF", "*.pdf")],
+            filetypes=[(self._t("ft_pdf"), "*.pdf")],
             initialfile="Final_Merge.pdf",
         )
         if p:
@@ -881,7 +981,7 @@ class App(tk.Tk):
     def tile_open_out_dir(self):
         p = (self.tile_out_var.get() or "").strip()
         if not p:
-            messagebox.showinfo("Folder", "Specify an output file first.", parent=self)
+            messagebox.showinfo(self._t("dlg_folder"), self._t("dlg_folder_need_out"), parent=self)
             return
         folder = Path(p).parent
         if folder.exists():
@@ -890,37 +990,37 @@ class App(tk.Tk):
 
                 os.startfile(folder)  # type: ignore[attr-defined]
             except Exception as e:
-                messagebox.showerror("Error", str(e), parent=self)
+                messagebox.showerror(self._t("dlg_error"), str(e), parent=self)
         else:
-            messagebox.showinfo("Folder", f"Folder does not exist yet:\n{folder}", parent=self)
+            messagebox.showinfo(self._t("dlg_folder"), self._t("dlg_folder_missing").format(path=folder), parent=self)
 
     def tile_run_merge(self):
         slip = Path(self.tile_slip_var.get().strip())
         labels = Path(self.tile_labels_var.get().strip())
         out_s = self.tile_out_var.get().strip()
         if not slip.exists() or slip.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid packing slip PDF.", parent=self)
+            messagebox.showerror(self._t("dlg_error"), self._t("err_tile_slip"), parent=self)
             return
         if not labels.exists() or labels.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid label catalog PDF.", parent=self)
+            messagebox.showerror(self._t("dlg_error"), self._t("err_tile_labels"), parent=self)
             return
         if not out_s:
-            messagebox.showerror("Error", "Specify an output path.", parent=self)
+            messagebox.showerror(self._t("dlg_error"), self._t("err_out_path"), parent=self)
             return
         out = Path(out_s)
         if out.suffix.lower() != ".pdf":
             out = out.with_suffix(".pdf")
             self.tile_out_var.set(str(out))
 
-        self.tile_status_var.set("Processing…")
+        self.tile_status_var.set(self._t("st_processing_ellipsis"))
         self.update_idletasks()
         try:
             log_lines = merge_packing_with_sample_labels(slip, labels, out, self.tile_exclusions)
-            self._tile_set_log("\n".join(log_lines) + f"\n\nFile:\n{out}")
-            self.tile_status_var.set("Completed")
+            self._tile_set_log("\n".join(log_lines) + f"\n\n{self._t('log_file_label')}\n{out}")
+            self.tile_status_var.set(self._t("st_completed"))
         except Exception as e:
-            self.tile_status_var.set("Error")
-            messagebox.showerror("Error", str(e), parent=self)
+            self.tile_status_var.set(self._t("st_error"))
+            messagebox.showerror(self._t("dlg_error"), str(e), parent=self)
 
     def _build_hd_thd_tab(self, root: ttk.Frame):
         BG = "#1e1e1e"
@@ -939,28 +1039,33 @@ class App(tk.Tk):
         right.pack(side="right", fill="y")
         right.pack_propagate(False)
 
-        tk.Label(
+        hh = tk.Label(
             main,
-            text="PDF Merger Pro — Home Depot (THD)",
+            text=self._t("hd_heading"),
             font=("Segoe UI", 16, "bold"),
             bg=BG,
             fg=FG,
-        ).pack(anchor="w")
-        tk.Label(
+        )
+        self._register_i18n(hh, "hd_heading")
+        hh.pack(anchor="w")
+        hd = tk.Label(
             main,
-            text="Packing slip: Model Number column (SMPL/ASMPL) + Qty Shipped; "
-            "labels: Product Sku in THD Barcode Labels.",
+            text=self._t("hd_desc"),
             font=("Segoe UI", 9),
             bg=BG,
             fg=SUB,
             wraplength=560,
             justify="left",
-        ).pack(anchor="w", pady=(4, 14))
+        )
+        self._register_i18n(hd, "hd_desc")
+        hd.pack(anchor="w", pady=(4, 14))
 
-        def row_file(label_txt: str, var: tk.StringVar, browse_cmd, border: str):
+        def row_file(label_key: str, var: tk.StringVar, browse_cmd, border: str):
             fr = tk.Frame(main, bg=BG)
             fr.pack(fill="x", pady=(0, 10))
-            tk.Label(fr, text=label_txt, font=("Segoe UI", 10), bg=BG, fg=FG).pack(anchor="w")
+            ll = tk.Label(fr, text=self._t(label_key), font=("Segoe UI", 10), bg=BG, fg=FG)
+            self._register_i18n(ll, label_key)
+            ll.pack(anchor="w")
             box = tk.Frame(fr, bg=border, padx=2, pady=2)
             box.pack(fill="x", pady=(4, 0))
             inner = tk.Frame(box, bg=PANEL)
@@ -975,9 +1080,9 @@ class App(tk.Tk):
                 relief="flat",
             )
             e.pack(side="left", fill="x", expand=True, padx=8, pady=8)
-            tk.Button(
+            bb = tk.Button(
                 inner,
-                text="Browse…",
+                text=self._t("browse"),
                 command=browse_cmd,
                 font=("Segoe UI", 9),
                 bg="#3c3c3c",
@@ -985,17 +1090,19 @@ class App(tk.Tk):
                 activebackground="#505050",
                 activeforeground=FG,
                 relief="flat",
-            ).pack(side="right", padx=6, pady=6)
+            )
+            self._register_i18n(bb, "browse")
+            bb.pack(side="right", padx=6, pady=6)
 
-        row_file("1. Packing slip PDF (Home Depot)", self.hd_slip_var, self.hd_pick_slip, "#3a7bd5")
-        row_file("2. THD Barcode Labels PDF", self.hd_labels_var, self.hd_pick_labels, "#c66900")
-        row_file("3. Output", self.hd_out_var, self.hd_pick_out, "#2e9d5c")
+        row_file("hd_row1", self.hd_slip_var, self.hd_pick_slip, "#3a7bd5")
+        row_file("hd_row2", self.hd_labels_var, self.hd_pick_labels, "#c66900")
+        row_file("hd_row3", self.hd_out_var, self.hd_pick_out, "#2e9d5c")
 
         run_fr = tk.Frame(main, bg=BG)
         run_fr.pack(fill="x", pady=(16, 8))
-        tk.Button(
+        hmerge = tk.Button(
             run_fr,
-            text="MERGE",
+            text=self._t("hd_merge"),
             command=self.hd_run_merge,
             font=("Segoe UI", 11, "bold"),
             bg=ACCENT,
@@ -1005,10 +1112,12 @@ class App(tk.Tk):
             relief="flat",
             padx=18,
             pady=10,
-        ).pack(side="left")
-        tk.Button(
+        )
+        self._register_i18n(hmerge, "hd_merge")
+        hmerge.pack(side="left")
+        hof = tk.Button(
             run_fr,
-            text="Open output folder",
+            text=self._t("hd_open_folder"),
             command=self.hd_open_out_dir,
             font=("Segoe UI", 9),
             bg="#3c3c3c",
@@ -1017,7 +1126,9 @@ class App(tk.Tk):
             relief="flat",
             padx=12,
             pady=8,
-        ).pack(side="left", padx=(12, 0))
+        )
+        self._register_i18n(hof, "hd_open_folder")
+        hof.pack(side="left", padx=(12, 0))
 
         tk.Label(main, textvariable=self.hd_status_var, font=("Segoe UI", 9), bg=BG, fg="#3ecb7a").pack(
             anchor="w", pady=(10, 4)
@@ -1040,22 +1151,26 @@ class App(tk.Tk):
         hscr.pack(side="right", fill="y")
         self.hd_log.config(yscrollcommand=hscr.set, state="disabled")
 
-        tk.Label(
+        hs = tk.Label(
             right,
-            text="SKU exclusions",
+            text=self._t("hd_sku_title"),
             font=("Segoe UI", 11, "bold"),
             bg=PANEL,
             fg=FG,
-        ).pack(anchor="w", padx=12, pady=(14, 6))
-        tk.Label(
+        )
+        self._register_i18n(hs, "hd_sku_title")
+        hs.pack(anchor="w", padx=12, pady=(14, 6))
+        hhi = tk.Label(
             right,
-            text="If the code contains this substring — the line is skipped (separate list from Tile Club).",
+            text=self._t("hd_sku_hint"),
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
             wraplength=250,
             justify="left",
-        ).pack(anchor="w", padx=12, pady=(0, 8))
+        )
+        self._register_i18n(hhi, "hd_sku_hint")
+        hhi.pack(anchor="w", padx=12, pady=(0, 8))
 
         tk.Entry(
             right,
@@ -1090,13 +1205,15 @@ class App(tk.Tk):
             relief="flat",
         ).pack(side="right")
 
-        tk.Label(
+        hlc = tk.Label(
             right,
-            text="List (saved automatically)",
+            text=self._t("hd_list_caption"),
             font=("Segoe UI", 8),
             bg=PANEL,
             fg=SUB,
-        ).pack(anchor="w", padx=12, pady=(0, 4))
+        )
+        self._register_i18n(hlc, "hd_list_caption")
+        hlc.pack(anchor="w", padx=12, pady=(0, 4))
 
         list_fr = tk.Frame(right, bg=PANEL)
         list_fr.pack(fill="both", expand=True, padx=12, pady=(0, 12))
@@ -1158,21 +1275,21 @@ class App(tk.Tk):
         self._hd_refresh_excl_list()
 
     def hd_pick_slip(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.hd_slip_var.set(p)
             if not self.hd_out_var.get():
                 self.hd_out_var.set(str(Path(p).parent / "THD_Final_Merge.pdf"))
 
     def hd_pick_labels(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.hd_labels_var.set(p)
 
     def hd_pick_out(self):
         p = filedialog.asksaveasfilename(
             defaultextension=".pdf",
-            filetypes=[("PDF", "*.pdf")],
+            filetypes=[(self._t("ft_pdf"), "*.pdf")],
             initialfile="THD_Final_Merge.pdf",
         )
         if p:
@@ -1181,7 +1298,7 @@ class App(tk.Tk):
     def hd_open_out_dir(self):
         p = (self.hd_out_var.get() or "").strip()
         if not p:
-            messagebox.showinfo("Folder", "Specify an output file first.", parent=self)
+            messagebox.showinfo(self._t("dlg_folder"), self._t("dlg_folder_need_out"), parent=self)
             return
         folder = Path(p).parent
         if folder.exists():
@@ -1190,40 +1307,40 @@ class App(tk.Tk):
 
                 os.startfile(folder)  # type: ignore[attr-defined]
             except Exception as e:
-                messagebox.showerror("Error", str(e), parent=self)
+                messagebox.showerror(self._t("dlg_error"), str(e), parent=self)
         else:
-            messagebox.showinfo("Folder", f"Folder does not exist yet:\n{folder}", parent=self)
+            messagebox.showinfo(self._t("dlg_folder"), self._t("dlg_folder_missing").format(path=folder), parent=self)
 
     def hd_run_merge(self):
         slip = Path(self.hd_slip_var.get().strip())
         labels = Path(self.hd_labels_var.get().strip())
         out_s = self.hd_out_var.get().strip()
         if not slip.exists() or slip.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid packing slip PDF.", parent=self)
+            messagebox.showerror(self._t("dlg_error"), self._t("err_hd_slip"), parent=self)
             return
         if not labels.exists() or labels.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid THD Barcode Labels PDF.", parent=self)
+            messagebox.showerror(self._t("dlg_error"), self._t("err_hd_labels"), parent=self)
             return
         if not out_s:
-            messagebox.showerror("Error", "Specify an output path.", parent=self)
+            messagebox.showerror(self._t("dlg_error"), self._t("err_out_path"), parent=self)
             return
         out = Path(out_s)
         if out.suffix.lower() != ".pdf":
             out = out.with_suffix(".pdf")
             self.hd_out_var.set(str(out))
 
-        self.hd_status_var.set("Processing…")
+        self.hd_status_var.set(self._t("st_processing_ellipsis"))
         self.update_idletasks()
         try:
             log_lines = merge_hd_packing_with_thd_labels(slip, labels, out, self.hd_exclusions)
-            self._hd_set_log("\n".join(log_lines) + f"\n\nFile:\n{out}")
-            self.hd_status_var.set("Completed")
+            self._hd_set_log("\n".join(log_lines) + f"\n\n{self._t('log_file_label')}\n{out}")
+            self.hd_status_var.set(self._t("st_completed"))
         except Exception as e:
-            self.hd_status_var.set("Error")
-            messagebox.showerror("Error", str(e), parent=self)
+            self.hd_status_var.set(self._t("st_error"))
+            messagebox.showerror(self._t("dlg_error"), str(e), parent=self)
 
     def pick_pdf(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.pdf_path_var.set(p)
             if not self.out_dir_var.get():
@@ -1245,13 +1362,13 @@ class App(tk.Tk):
         out_dir = Path(self.out_dir_var.get().strip())
 
         if not pdf_path.exists() or pdf_path.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid input PDF file.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_split_pdf"))
             return
         if not out_dir.exists() or not out_dir.is_dir():
-            messagebox.showerror("Error", "Select a valid output folder.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_split_dir"))
             return
 
-        self.split_status_var.set("Processing...")
+        self.split_status_var.set(self._t("st_processing"))
         self.update_idletasks()
 
         try:
@@ -1276,23 +1393,23 @@ class App(tk.Tk):
                 if orders_out.exists():
                     orders_out.unlink()
 
-            result = (
-                f"Done.\n\n"
-                f"Classification (unchanged): samples vs orders by existing rules.\n"
-                f"Output page order: chronological by slip Date: (Home Depot header) within each file.\n\n"
-                f"Samples pages ({len(samples_sorted)}): {samples_sorted}\n"
-                f"Orders pages ({len(orders_sorted)}): {orders_sorted}\n\n"
-                f"Samples date order:\n" + "\n".join(s_log) + "\n\n"
-                f"Orders date order:\n" + "\n".join(o_log) + "\n\n"
-                f"Output files:\n"
-                f"- {samples_out if samples_sorted else '(no samples pages)'}\n"
-                f"- {orders_out if orders_sorted else '(no orders pages)'}"
+            sout = str(samples_out) if samples_sorted else self._t("split_no_samples")
+            oout = str(orders_out) if orders_sorted else self._t("split_no_orders")
+            result = self._t("split_result").format(
+                ns=len(samples_sorted),
+                samples=samples_sorted,
+                no=len(orders_sorted),
+                orders=orders_sorted,
+                slog="\n".join(s_log),
+                olog="\n".join(o_log),
+                sout=sout,
+                oout=oout,
             )
             self._set_text(self.result_box, result)
-            self.split_status_var.set("Completed")
+            self.split_status_var.set(self._t("st_completed"))
         except Exception as e:
-            self.split_status_var.set("Failed")
-            messagebox.showerror("Error", str(e))
+            self.split_status_var.set(self._t("st_failed"))
+            messagebox.showerror(self._t("dlg_error"), str(e))
 
     # ---------------- Merge tab actions ----------------
     def _refresh_merge_listbox(self):
@@ -1301,7 +1418,7 @@ class App(tk.Tk):
             self.merge_listbox.insert(tk.END, str(p))
 
     def merge_add_files(self):
-        paths = filedialog.askopenfilenames(filetypes=[("PDF files", "*.pdf")])
+        paths = filedialog.askopenfilenames(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if not paths:
             return
         existing = {str(p).lower() for p in self.merge_files}
@@ -1351,7 +1468,7 @@ class App(tk.Tk):
     def merge_pick_out_file(self):
         p = filedialog.asksaveasfilename(
             defaultextension=".pdf",
-            filetypes=[("PDF files", "*.pdf")],
+            filetypes=[(self._t("ft_pdf"), "*.pdf")],
             initialfile="merged_output.pdf",
         )
         if p:
@@ -1359,53 +1476,53 @@ class App(tk.Tk):
 
     def process_merge(self):
         if len(self.merge_files) < 2:
-            messagebox.showerror("Error", "Add at least two PDF files to merge.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_merge_count"))
             return
 
         out_file = Path(self.merge_out_file_var.get().strip())
         if not out_file:
-            messagebox.showerror("Error", "Select an output PDF file.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_merge_out"))
             return
         if out_file.suffix.lower() != ".pdf":
             out_file = out_file.with_suffix(".pdf")
             self.merge_out_file_var.set(str(out_file))
 
-        self.merge_status_var.set("Merging...")
+        self.merge_status_var.set(self._t("st_merging"))
         self.update_idletasks()
 
         try:
             sorted_paths, sort_log = _sort_pdf_files_by_hd_first_page_date(self.merge_files)
             merge_pdfs(sorted_paths, out_file)
-            result = (
-                f"Done.\n\nMerged {len(sorted_paths)} files into:\n{out_file}\n\n"
-                f"Chronological order (by Date: on page 1 of each PDF):\n"
-                + "\n".join(sort_log)
-                + "\n\nOriginal listbox order was:\n"
-                + "\n".join(f"- {p}" for p in self.merge_files)
+            orig_lines = "\n".join(self._t("merge_orig_line").format(path=p) for p in self.merge_files)
+            result = self._t("merge_result").format(
+                n=len(sorted_paths),
+                out=out_file,
+                sort_log="\n".join(sort_log),
+                orig=orig_lines,
             )
             self._set_text(self.merge_result_box, result)
-            self.merge_status_var.set("Completed")
+            self.merge_status_var.set(self._t("st_completed"))
         except Exception as e:
-            self.merge_status_var.set("Failed")
-            messagebox.showerror("Error", str(e))
+            self.merge_status_var.set(self._t("st_failed"))
+            messagebox.showerror(self._t("dlg_error"), str(e))
 
     # ---------------- Packing slips + labels tab ----------------
     def logistics_pick_slips(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.logistics_slips_var.set(p)
             if not self.logistics_out_var.get():
                 self.logistics_out_var.set(str(Path(p).parent / "FINAL_MERGE_BLOCKS.pdf"))
 
     def logistics_pick_labels(self):
-        p = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        p = filedialog.askopenfilename(filetypes=[(self._t("ft_pdf"), "*.pdf")])
         if p:
             self.logistics_labels_var.set(p)
 
     def logistics_pick_out(self):
         p = filedialog.asksaveasfilename(
             defaultextension=".pdf",
-            filetypes=[("PDF files", "*.pdf")],
+            filetypes=[(self._t("ft_pdf"), "*.pdf")],
             initialfile="FINAL_MERGE_BLOCKS.pdf",
         )
         if p:
@@ -1417,36 +1534,36 @@ class App(tk.Tk):
         out_path = Path(self.logistics_out_var.get().strip())
 
         if not slips_path.exists() or slips_path.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid packing slips PDF.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_log_slips"))
             return
         if not labels_path.exists() or labels_path.suffix.lower() != ".pdf":
-            messagebox.showerror("Error", "Select a valid labels PDF.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_log_labels"))
             return
         if not out_path:
-            messagebox.showerror("Error", "Select an output PDF path.")
+            messagebox.showerror(self._t("dlg_error"), self._t("err_log_out"))
             return
         if out_path.suffix.lower() != ".pdf":
             out_path = out_path.with_suffix(".pdf")
             self.logistics_out_var.set(str(out_path))
 
-        self.logistics_status_var.set("Merging...")
+        self.logistics_status_var.set(self._t("st_merging"))
         self.update_idletasks()
 
         try:
             log_lines, n_match, n_lbl, orphan_path = merge_slips_with_labels(
                 slips_path, labels_path, out_path
             )
-            body = "\n".join(log_lines) + f"\n\nMain output:\n{out_path}"
+            body = "\n".join(log_lines) + f"\n\n{self._t('log_main_output')}\n{out_path}"
             if orphan_path:
-                body += f"\n\nUnmatched slips only:\n{orphan_path}"
+                body += f"\n\n{self._t('log_unmatched')}\n{orphan_path}"
             self._set_text(self.logistics_log, body)
-            msg = f"Completed — matched: {n_match} slips + {n_lbl} labels"
+            msg = self._t("logistics_done").format(n=n_match, n_lbl=n_lbl)
             if orphan_path:
-                msg += f"; orphans -> {orphan_path.name}"
+                msg += self._t("logistics_done_orphans").format(name=orphan_path.name)
             self.logistics_status_var.set(msg)
         except Exception as e:
-            self.logistics_status_var.set("Failed")
-            messagebox.showerror("Error", str(e))
+            self.logistics_status_var.set(self._t("st_failed"))
+            messagebox.showerror(self._t("dlg_error"), str(e))
 
 
 if __name__ == "__main__":
